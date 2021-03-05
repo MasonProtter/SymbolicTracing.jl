@@ -39,7 +39,8 @@ SymbolicUtils.Term{Any, Nothing}
     x: UInt64 0x0000000000000000
 ```
 
-To register a certain function as being a natural stopping point for tracing (i.e. don't recurse inside it), use `@register`
+To register a certain function as being a natural stopping point for tracing (i.e. don't recurse inside it),
+use `@register` from Symbolics.jl
 ```julia
 julia> h(X::AbstractMatrix) = X .+ 1
 
