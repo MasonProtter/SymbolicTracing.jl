@@ -4,7 +4,11 @@ using SymbolicUtils, IRTools
 using SymbolicUtils: Symbolic, Term, Sym
 using IRTools: @dynamo, argument!, IR, isexpr
 
-Base.@pure sym_substitute(::Type{TSym}) where {T, TSym <: Symbolic{T}} = getfield(T, :abstract) ? T : TSym 
+export @trace, trace
+
+Base.@pure function sym_substitute(::Type{TSym}) where {T, TSym <: Symbolic{T}}
+    Base.unwrap_unionall(T).abstract ? T : TSym
+end
 sym_substitute(::Type{T}) where {T} = T
 
 @dynamo function sneakyinvoke(f, ::Type{T}, args...) where T<:Tuple
@@ -33,9 +37,10 @@ _trace(f) = trace(f)
 @generated function _trace(f::F, args...) where {F}
     args′ = sym_substitute.(args)
     ex = if any(args .<: Symbolic)
-	if isregistered(F)
-	    :($Term(f, [args...]))
-	elseif fieldcount(F) == 0
+	# if isregistered(F)
+        #     Core.println("hi")
+	#     :($Term(f, [args...]))
+	if fieldcount(F) == 0
             fi = F.instance
             if hasmethod(fi, Tuple{args...})
                 :(f(args...))
@@ -51,7 +56,7 @@ _trace(f) = trace(f)
     else
 	:(f(args...))
     end
-    
+    "boo!"
     ci = expr_to_codeinfo(SymbolicTracing, [Symbol("#self#"), :f, :args], [:F], (F,), ex)
     ci.edges = []
     
@@ -71,7 +76,7 @@ _trace(f) = trace(f)
             end
         end
     end
-    push!(ci.edges, Core.Compiler.method_instances(isregistered, Type{Type{F}})...)
+    # push!(ci.edges, Core.Compiler.method_instances(isregistered, Type{Type{<:Any}})...)
     return ci
 end
 
@@ -123,20 +128,20 @@ macro trace(fcall)
 end
 
 
-macro register(fs...)
-    ex = Expr(:block, __source__)
-    for f in fs
-        push!(ex.args, :($SymbolicTracing.isregistered(::Type{typeof($f)}) = true))
-    end
-    esc(ex)
-end
+# macro register(fs...)
+#     ex = Expr(:block, __source__)
+#     for f in fs
+#         push!(ex.args, :($SymbolicTracing.isregistered(::Type{typeof($f)}) = true))
+#     end
+#     esc(ex)
+# end
 
-# If isregistered(typeof(f)) == true, then inside a pass, we won't recurse into the insides of f. 
-# Registered functions are stopping points for us
+# # If isregistered(typeof(f)) == true, then inside a pass, we won't recurse into the insides of f. 
+# # Registered functions are stopping points for us
 
-isregistered(::Type{T}) where {T} = false
-@register((+), (-), (*), (/), (^), exp, log,
-          sin, cos, tan, asin, acos, atan,
-          sinh, cosh, tanh, asinh, acosh, atanh, adjoint)
+# isregistered(::Type{T}) where {T} = false
+# @register((+), (-), (*), (/), (^), exp, log,
+#           sin, cos, tan, asin, acos, atan,
+#           sinh, cosh, tanh, asinh, acosh, atanh, adjoint)
 
 end # module
