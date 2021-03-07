@@ -37,13 +37,12 @@ _trace(f) = trace(f)
 @generated function _trace(f::F, args...) where {F}
     args′ = sym_substitute.(args)
     ex = if any(args .<: Symbolic)
-	# if isregistered(F)
-        #     Core.println("hi")
-	#     :($Term(f, [args...]))
-	if fieldcount(F) == 0
+        if fieldcount(F) == 0
             fi = F.instance
             if hasmethod(fi, Tuple{args...})
                 :(f(args...))
+            elseif fi isa Type
+                :($Term(f, $Any[args...]))
             elseif hasmethod(fi, Tuple{args′...})
 	        :($trace($sneakyinvoke, f, Tuple{$(args′...)}, args...))
             else
@@ -51,7 +50,7 @@ _trace(f) = trace(f)
                 error("Could not trace into $fi($sigs). The method may not exist.\nRemember that trace will not recurse for Symbolic{T} for concretely typed T.")
             end
         else
-            :($trace($sneakyinvoke, f, $args′, args...))
+            :($Term(f, $Any[args...]))
 	end
     else
 	:(f(args...))
@@ -76,9 +75,10 @@ _trace(f) = trace(f)
             end
         end
     end
-    # push!(ci.edges, Core.Compiler.method_instances(isregistered, Type{Type{<:Any}})...)
     return ci
 end
+
+
 
 """
     expr_to_codeinfo(m::Module, argnames, spnames, sp, e::Expr)
@@ -126,22 +126,5 @@ end
 macro trace(fcall)
     :($trace(() -> $fcall)) |> esc
 end
-
-
-# macro register(fs...)
-#     ex = Expr(:block, __source__)
-#     for f in fs
-#         push!(ex.args, :($SymbolicTracing.isregistered(::Type{typeof($f)}) = true))
-#     end
-#     esc(ex)
-# end
-
-# # If isregistered(typeof(f)) == true, then inside a pass, we won't recurse into the insides of f. 
-# # Registered functions are stopping points for us
-
-# isregistered(::Type{T}) where {T} = false
-# @register((+), (-), (*), (/), (^), exp, log,
-#           sin, cos, tan, asin, acos, atan,
-#           sinh, cosh, tanh, asinh, acosh, atanh, adjoint)
 
 end # module
